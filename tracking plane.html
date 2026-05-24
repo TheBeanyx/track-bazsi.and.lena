@@ -15,7 +15,7 @@
         }
         #map {
             width: 100%;
-            height: 100vh; /* Teljes képernyős térkép */
+            height: 100vh;
         }
         #status-panel {
             position: absolute;
@@ -36,82 +36,89 @@
 
     <div id="status-panel">
         <h3>Járat: W62362</h3>
-        <p id="flight-status">Keresés a légtérben...</p>
+        <p id="flight-status">Kapcsolódás a radarhoz...</p>
         <p id="flight-info"></p>
     </div>
 
     <div id="map"></div>
 
     <script>
-        // 1. Saját térkép létrehozása (Alapértelmezetten Európa közepe)
+        // Térkép inicializálása Európa közepére
         const map = L.map('map').setView([47.5, 19.0], 5);
 
-        // Ingyenes, tiszta térkép dizájn (OpenStreetMap)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap'
         }).addTo(map);
 
         let planeMarker = null;
-        const flightNumber = "W62362";
+        // A Wizz Air hívójelek a radarokon általában WZZ-vel kezdődnek (WZZ2362 vagy WZZ62362)
+        const flightIdentifiers = ["WZZ2362", "W62362", "WZZ62362"]; 
 
-        // Egyedi repülőgép ikon beállítása
         const planeIcon = L.icon({
-            iconUrl: 'https://cdn-icons-png.flaticon.com/512/61/61212.png', // Repülő ikon
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/61/61212.png',
             iconSize: [32, 32],
             iconAnchor: [16, 16]
         });
 
-        // 2. Adatok lekérése a nyílt élő légtér API-ból
         async function trackFlight() {
             try {
-                // Élő adatok lekérése a publikus ADS-B adatbázisból proxy-n keresztül
-                const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://opendata.adsbexchange.com/api/v2/autocomplete?q=' + flightNumber)}`);
+                // CORS hiba megkerülése egy publikus CORS proxy használatával
+                const targetUrl = 'https://opensky-network.org/api/states/all';
+                const proxyUrl = 'https://cors-anywhere.herokuapp.com/'; 
                 
-                // Mivel a fenti egy általános nyílt elérés, ha a gép épp a levegőben van, egy alternatív stabil nyílt forrás (OpenSky) koordinátáit használjuk szimulálva vagy élesben:
-                const testResponse = await fetch('https://opensky-network.org/api/states/all');
-                const data = await testResponse.json();
+                // Ha a fenti proxy túlterhelt, egy másik stabil alternatív proxy-t használunk (allorigins)
+                const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+                const rawData = await response.json();
                 
-                // Megkeressük a Wizz Air gépet (W6 / WZZ hívójellel indítva)
-                // Megjegyzés: A járatok csak akkor jelennek meg a térképen, ha ÉPPEN A LEVEGŐBEN VANNAK.
-                let targetFlight = data.states.find(flight => flight[1] && flight[1].trim().includes("WZZ2362") || flight[1].trim().includes("W62362"));
+                // Az allorigins proxy a 'contents' kulcs alá csomagolja a választ stringként
+                const data = JSON.parse(rawData.contents);
+                
+                if (!data || !data.states) {
+                    throw new Error("Nem érkezett érvényes adat a radarról.");
+                }
+
+                // Megkeressük a járatot a listában a hívójelek alapján
+                let targetFlight = data.states.find(flight => {
+                    if (flight[1]) {
+                        const cleanCallsign = flight[1].trim().toUpperCase();
+                        return flightIdentifiers.some(id => cleanCallsign.includes(id));
+                    }
+                    return false;
+                });
 
                 if (targetFlight) {
                     const lat = targetFlight[6];
                     const lon = targetFlight[5];
-                    const velocity = Math.round(targetFlight[9] * 3.6); // m/s-ból km/h
+                    const velocity = Math.round(targetFlight[9] * 3.6); // m/s -> km/h
                     const altitude = Math.round(targetFlight[7]); // méter
 
                     document.getElementById('flight-status').innerHTML = "🔴 <strong>ÉLŐBEN A LEVEGŐBEN</strong>";
-                    document.getElementById('flight-info').innerHTML = `Sebesség: ${velocity} km/h<br>Magasság: ${altitude} m`;
+                    document.getElementById('flight-info').innerHTML = `Sebesség: ${velocity} km/h<br>Magasság: ${altitude} m<br>Koordináta: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
 
-                    // Ha még nincs ikon a térképen, lerakjuk, ha van, csak frissítjük a helyét
                     if (!planeMarker) {
                         planeMarker = L.marker([lat, lon], {icon: planeIcon}).addTo(map);
-                        map.setView([lat, lon], 7); // Ráközelítünk a gépre
+                        map.setView([lat, lon], 7); 
                     } else {
                         planeMarker.setLatLng([lat, lon]);
                     }
                 } else {
-                    // Ha a gép épp a földön áll és nem repül
                     document.getElementById('flight-status').innerHTML = "⚪ A járat jelenleg nem repül.";
-                    document.getElementById('flight-info').innerHTML = "A gép csak akkor jelenik meg a saját térképeden, ha épp a levegőben van.";
+                    document.getElementById('flight-info').innerHTML = "A gép csak akkor jelenik meg a saját térképeden, ha épp a levegőben van és ad jelet.";
                     
-                    // DEMO MÓD: Ha ki akarod próbálni hogyan néz ki amikor repül, vedd ki a megjegyzést az alábbi sorokból:
-                    /*
-                    const demoLat = 47.4979; const demoLon = 19.0402;
-                    if (!planeMarker) { planeMarker = L.marker([demoLat, demoLon], {icon: planeIcon}).addTo(map); map.setView([demoLat, demoLon], 6); }
-                    document.getElementById('flight-status').innerHTML = "🔵 DEMO MÓD (Budapest felett)";
-                    */
+                    if (planeMarker) {
+                        map.removeLayer(planeMarker);
+                        planeMarker = null;
+                    }
                 }
             } catch (error) {
-                console.error("Hiba történt az adatok lekérésekor:", error);
-                document.getElementById('flight-status').innerHTML = "⚠️ Adatlekérési hiba. Újrapróbálkozás...";
+                console.error("Hiba:", error);
+                document.getElementById('flight-status').innerHTML = "⚠️ Radar adatlekérési hiba. Újrapróbálkozás...";
             }
         }
 
-        // Futtatás azonnal, majd minden 30 másodpercben újra
+        // Futtatás indításkor, majd 45 másodpercenként
         trackFlight();
-        setInterval(trackFlight, 30000);
+        setInterval(trackFlight, 45000);
     </script>
 </body>
 </html>
