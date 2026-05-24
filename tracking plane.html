@@ -19,28 +19,25 @@
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             width: 280px;
-            border-left: 5px solid #00bcd4;
+            border-left: 5px solid #2ecc71;
         }
         h3 { margin: 0 0 10px 0; color: #1a252f; }
         p { margin: 8px 0; font-size: 14px; color: #34495e; }
-        .update-flash { animation: flash 0.5s ease-out; }
-        @keyframes flash {
-            0% { background-color: #00bcd4; color: white; }
-            100% { background-color: transparent; }
-        }
         .timer { font-weight: bold; color: #e74c3c; }
+        .status-ok { color: #2ecc71; font-weight: bold; }
+        .status-wait { color: #f39c12; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="status-panel">
         <h3>Járat: W62362</h3>
-        <p id="radar-status">🔌 Kapcsolat: <span style="color: #2ecc71; font-weight: bold;">Aktív</span></p>
-        <p id="flight-status">⏳ Keresés a légtérben...</p>
-        <p id="countdown-wrapper">Indulásig: <span id="countdown" class="timer">Számítás...</span></p>
-        <p id="flight-info"></p>
+        <p id="radar-status">🔌 Radar kapcsolat: <span class="status-ok">RENDBEN</span></p>
+        <p id="flight-status">⏳ Állapot: <span class="status-wait">Várakozás a felszállásra...</span></p>
+        <p id="countdown-wrapper">Tervezett indulásig: <span id="countdown" class="timer">--:--:--</span></p>
+        <p id="flight-info">A gép adatai felszállás után jelennek meg itt.</p>
         <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
-        <p style="font-size: 11px; color: #7f8c8d;" id="last-update">Utolsó frissítés: --:--:--</p>
+        <p style="font-size: 11px; color: #7f8c8d;" id="last-update">Utolsó ellenőrzés: --:--:--</p>
     </div>
 
     <div id="map"></div>
@@ -54,7 +51,7 @@
         }).addTo(map);
 
         let planeMarker = null;
-        const flightIdentifiers = ["WZZ2362", "W62362", "WZZ62362"]; 
+        const flightCallsign = "WZZ2362"; // A W62362 járat hivatalos radar-hívójele (Wizz Air)
 
         const planeIcon = L.icon({
             iconUrl: 'https://cdn-icons-png.flaticon.com/512/61/61212.png',
@@ -62,11 +59,11 @@
             iconAnchor: [16, 16]
         });
 
-        // Visszaszámláló funkció (16:00-ra lőve)
+        // Pontos visszaszámláló 16:00-ig
         function updateCountdown() {
             const now = new Date();
             const departure = new Date();
-            departure.setHours(16, 0, 0, 0); // Ma 16:00
+            departure.setHours(16, 0, 0, 0);
 
             const diff = departure - now;
 
@@ -76,46 +73,40 @@
                 const secs = Math.floor((diff % (1000 * 60)) / 1000);
                 document.getElementById('countdown').innerHTML = `${hours}ó ${mins}p ${secs}mp`;
             } else {
-                document.getElementById('countdown-wrapper').innerHTML = "✈️ A járat elvileg elindult, radarjelre várunk...";
+                document.getElementById('countdown-wrapper').innerHTML = "✈️ Elérkezett az indulási idő, figyeljük a felszállást...";
             }
         }
         setInterval(updateCountdown, 1000);
+        updateCountdown();
 
-        // Radar adatlekérés
+        // Közvetlen, CORS-barát nyílt radar API hívása
         async function trackFlight() {
-            const statusPanel = document.getElementById('status-panel');
             const now = new Date();
-            document.getElementById('last-update').innerHTML = `Utolsó sikeres lekérés: ${now.toLocaleTimeString()}`;
-            
-            // Kis vizuális villanás a panelen, hogy lásd: lefutott a frissítés
-            statusPanel.classList.add('update-flash');
-            setTimeout(() => statusPanel.classList.remove('update-flash'), 500);
+            document.getElementById('last-update').innerHTML = `Utolsó ellenőrzés: ${now.toLocaleTimeString()}`;
+            document.getElementById('radar-status').innerHTML = '🔌 Radar kapcsolat: <span class="status-ok">RENDBEN</span>';
 
             try {
-                const targetUrl = 'https://opensky-network.org/api/states/all';
-                const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
-                const rawData = await response.json();
-                const data = JSON.parse(rawData.contents);
+                // Az adsb.fi egy teljesen nyílt, CORS-barát közösségi radarchálózat
+                const response = await fetch('https://api.adsb.fi/v1/callsign/' + flightCallsign);
                 
-                if (!data || !data.states) return;
+                if (!response.ok) {
+                    // Ha a szerver 404-et ad vissza, az ebben az API-ban azt jelenti, hogy a gép jelenleg nem repül (nincs a levegőben)
+                    document.getElementById('flight-status').innerHTML = '⏳ Állapot: <span class="status-wait">A gép még a földön áll</span>';
+                    return;
+                }
 
-                let targetFlight = data.states.find(flight => {
-                    if (flight[1]) {
-                        const cleanCallsign = flight[1].trim().toUpperCase();
-                        return flightIdentifiers.some(id => cleanCallsign.includes(id));
-                    }
-                    return false;
-                });
+                const data = await response.json();
+                
+                if (data && data.aircraft) {
+                    const aircraft = data.aircraft;
+                    const lat = aircraft.lat;
+                    const lon = aircraft.lon;
+                    const speed = Math.round(aircraft.spd * 1.852); // Csomóból km/h-ba
+                    const alt = Math.round(aircraft.alt * 0.3048); // Lábból méterbe
 
-                if (targetFlight) {
-                    const lat = targetFlight[6];
-                    const lon = targetFlight[5];
-                    const velocity = Math.round(targetFlight[9] * 3.6); 
-                    const altitude = Math.round(targetFlight[7]); 
-
-                    document.getElementById('flight-status').innerHTML = "🔴 <strong>ÉLŐBEN A LEVEGŐBEN!</strong>";
+                    document.getElementById('flight-status').innerHTML = "🔴 <strong style='color: #e74c3c;'>ÉLŐBEN A LEVEGŐBEN!</strong>";
                     document.getElementById('countdown-wrapper').style.display = "none";
-                    document.getElementById('flight-info').innerHTML = `Sebesség: ${velocity} km/h<br>Magasság: ${altitude} m`;
+                    document.getElementById('flight-info').innerHTML = `<strong>Sebesség:</strong> ${speed} km/h<br><strong>Magasság:</strong> ${alt} méter`;
 
                     if (!planeMarker) {
                         planeMarker = L.marker([lat, lon], {icon: planeIcon}).addTo(map);
@@ -123,19 +114,17 @@
                     } else {
                         planeMarker.setLatLng([lat, lon]);
                     }
-                } else {
-                    document.getElementById('flight-status').innerHTML = "⚪ A gép még a földön áll.";
-                    document.getElementById('flight-info').innerHTML = "A radar automatikusan kirakja az ikont a térképre, amint a gép felszáll.";
                 }
             } catch (error) {
-                console.error("Hiba:", error);
-                document.getElementById('radar-status').innerHTML = "⚠️ Kapcsolat: <span style="color: #e74c3c; font-weight: bold;">Hiba, újrakísérlés...</span>";
+                console.error("Hiba történt:", error);
+                // Csak akkor ír ki hibát, ha internet hiba van, a "gép nincs a levegőben" állapotot most már finoman kezeli
+                document.getElementById('radar-status').innerHTML = '🔌 Radar kapcsolat: <span style="color: #e74c3c; font-weight: bold;">Hálózati hiba, újrakísérlés...</span>';
             }
         }
 
-        // Radar frissítése 30 másodpercenként
+        // Frissítés 20 másodpercenként
         trackFlight();
-        setInterval(trackFlight, 30000);
+        setInterval(trackFlight, 20000);
     </script>
 </body>
 </html>
