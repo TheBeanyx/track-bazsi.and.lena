@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tracking - Bazsi & Léna</title>
+    <title>Tracking - Balázs & Léna Idővonal</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * {
@@ -20,7 +20,6 @@
             height: 100vh;
         }
 
-
         #map {
             width: 100%;
             height: 100%;
@@ -29,6 +28,7 @@
             left: 0;
             z-index: 1;
         }
+
         .custom-marker {
             position: relative;
             width: 50px;
@@ -40,188 +40,399 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 80px;
-            height: 80px;
-            background: rgba(0, 122, 255, 0.2);
-            border: 1px solid rgba(0, 122, 255, 0.4);
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             animation: pulse-animation 2s infinite ease-out;
             pointer-events: none;
         }
+
+        .pulse-balazs { background: rgba(0, 122, 255, 0.2); border: 1px solid rgba(0, 122, 255, 0.4); }
+        .pulse-lena { background: rgba(255, 45, 85, 0.2); border: 1px solid rgba(255, 45, 85, 0.4); }
 
         .avatar-pin {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 50px;
-            height: 50px;
+            width: 45px;
+            height: 45px;
             border: 3px solid #fff;
             border-radius: 50%;
             box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            background-image: url('bazsi_lena.png');
             background-size: cover;
             background-position: center;
-            background-color: #007aff; 
         }
 
+        .pin-balazs { border-color: #007aff; }
+        .pin-lena { border-color: #ff2d55; }
 
-        .info-card {
+        /* Időválasztó panel */
+        .time-control-panel {
             position: absolute;
-            bottom: 30px;
+            top: 20px;
             left: 50%;
             transform: translateX(-50%);
             width: 90%;
-            max-width: 400px;
-            background: rgba(30, 30, 30, 0.75);
+            max-width: 500px;
+            background: rgba(30, 30, 30, 0.85);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 15px 20px;
             z-index: 1000;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
 
-        .card-handle {
-            width: 36px;
-            height: 5px;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 2.5px;
-            margin: 0 auto 15px auto;
+        .time-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .time-display {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: #007aff;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .time-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+        }
+
+        .time-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+
+        /* Alsó információs kártyák */
+        .cards-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 95%;
+            max-width: 800px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .info-card {
+            background: rgba(25, 25, 25, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            pointer-events: auto;
         }
 
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
         }
 
         .names {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
-            color: #ffffff;
         }
 
         .status-badge {
             display: inline-flex;
             align-items: center;
-            background: rgba(48, 209, 88, 0.2);
-            color: #30d158;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-size: 11px;
             font-weight: 600;
-            white-space: nowrap;
+            max-width: 160px;
         }
 
-        .status-dot {
-            width: 7px;
-            height: 7px;
-            background-color: #30d158;
-            border-radius: 50%;
-            margin-right: 6px;
-            animation: blink 1.5s infinite;
-        }
+        .badge-balazs { background: rgba(0, 122, 255, 0.15); color: #007aff; }
+        .badge-lena { background: rgba(255, 45, 85, 0.15); color: #ff2d55; }
 
         .location-info {
             display: flex;
             align-items: center;
-            margin-top: 5px;
+            margin-top: 4px;
+            font-size: 13px;
+            color: #aeaeae;
         }
 
         .location-icon {
-            margin-right: 8px;
-            color: #007aff;
+            margin-right: 5px;
         }
-
-        .current-city {
-            font-size: 16px;
-            color: #aeaeae;
-            font-weight: 400;
-        }
-
-        .update-time {
-            font-size: 12px;
-            color: #8e8e93;
-            margin-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            padding-top: 10px;
-            display: flex;
-            justify-content: space-between;
-        }
-
 
         .leaflet-control-attribution, .leaflet-control-zoom {
             display: none !important;
         }
 
+        /* Útvonalvonal animáció (nyíl hatás) */
+        .route-path {
+            stroke-dasharray: 8, 8;
+            animation: dash 30s linear infinite;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -1000;
+            }
+        }
 
         @keyframes pulse-animation {
             0% { transform: translate(-50%, -50%) scale(0.6); opacity: 1; }
-            100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
         }
 
-        @keyframes blink {
-            0% { opacity: 0.4; }
-            50% { opacity: 1; }
-            100% { opacity: 0.4; }
+        @media (max-width: 600px) {
+            .cards-container {
+                grid-template-columns: 1fr;
+                bottom: 15px;
+                gap: 8px;
+            }
+            .info-card { padding: 10px; }
+            .time-control-panel { top: 10px; }
         }
     </style>
 </head>
 <body>
 
-
     <div id="map"></div>
 
-    <div class="info-card">
-        <div class="card-handle"></div>
-        
-        <div class="card-header">
-            <div>
-                <h1 class="names">Bazsi & Léna</h1>
-                <div class="location-info">
-                    <span class="location-icon">📍</span>
-                    <span class="current-city">Bari, Olaszország</span>
-                </div>
-            </div>
-            <div class="status-badge">
-                <span class="status-dot"></span>
-                Nászúton vannak
-            </div>
+    <div class="time-control-panel">
+        <div class="time-header">
+            <span style="color: #8e8e93; font-weight: 500;">Élő útvonalkövetés</span>
+            <div id="timeDisplay" class="time-display">08:00</div>
         </div>
-
-        <div class="update-time">
-            <span>Helyzetjelző</span>
-            <span>Épp most frissült</span>
+        <div class="slider-container">
+            <input type="range" id="timeSlider" class="time-slider" min="0" max="1439" value="480">
         </div>
     </div>
 
+    <div class="cards-container">
+        <div class="info-card" style="border-top: 3px solid #007aff;">
+            <div class="card-header">
+                <div>
+                    <h1 class="names" style="color: #007aff;">Balázs</h1>
+                    <div class="location-info">
+                        <span class="location-icon">📍</span>
+                        <span id="balazsLoc">Betöltés...</span>
+                    </div>
+                </div>
+                <div id="balazsBadge" class="status-badge badge-balazs">Betöltés...</div>
+            </div>
+        </div>
+
+        <div class="info-card" style="border-top: 3px solid #ff2d55;">
+            <div class="card-header">
+                <div>
+                    <h1 class="names" style="color: #ff2d55;">Léna</h1>
+                    <div class="location-info">
+                        <span class="location-icon">📍</span>
+                        <span id="lenaLoc">Betöltés...</span>
+                    </div>
+                </div>
+                <div id="lenaBadge" class="status-badge badge-lena">Betöltés...</div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-//Bari coordináták
-        const bariCoords = [41.1171, 16.8719];
+        // Javított helyszínek koordinátái (Creascola pontosítva)
+        const coords = {
+            creascola: [47.4524, 18.9275], // Budaörs, Liget u. 3/A
+            budaors: [47.4621, 18.9530],   // Budaörs központ / lakás zóna
+            hegyalja: [47.4890, 19.0180]   // XII. kerület Hegyalja út zóna
+        };
 
+        // Térkép középpont igazítása, hogy minden jól látszódjon
         const map = L.map('map', {
             zoomControl: false,
             attributionControl: false
-        }).setView(bariCoords, 13);
-
+        }).setView([47.468, 18.965], 13);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             maxZoom: 19
         }).addTo(map);
 
+        // Dinamikus markerek létrehozása
+        const balazsMarker = L.marker(coords.budaors, {
+            icon: L.divIcon({
+                className: 'custom-marker',
+                html: '<div class="pulse pulse-balazs"></div><div class="avatar-pin pin-balazs" style="background-image: url(\'balazs.png\');"></div>',
+                iconSize: [50, 50], iconAnchor: [25, 25]
+            })
+        }).addTo(map);
 
-        const customIcon = L.divIcon({
-            className: 'custom-marker',
-            html: '<div class="pulse"></div><div class="avatar-pin"></div>',
-            iconSize: [50, 50],
-            iconAnchor: [25, 25]
+        const lenaMarker = L.marker(coords.hegyalja, {
+            icon: L.divIcon({
+                className: 'custom-marker',
+                html: '<div class="pulse pulse-lena"></div><div class="avatar-pin pin-lena" style="background-image: url(\'lena.png\');"></div>',
+                iconSize: [50, 50], iconAnchor: [25, 25]
+            })
+        }).addTo(map);
+
+        let balazsRouteLine = null;
+        let lenaRouteLine = null;
+
+        // Pozíció interpoláció
+        function interpolateCoords(from, to, progress) {
+            return [
+                from[0] + (to[0] - from[0]) * progress,
+                from[1] + (to[1] - from[1]) * progress
+            ];
+        }
+
+        function toMins(h, m) { return h * 60 + m; }
+
+        // Útvonalvonal frissítése
+        function updateRouteLine(person, from, to, isActive) {
+            if (person === 'balazs') {
+                if (balazsRouteLine) map.removeLayer(balazsRouteLine);
+                if (isActive) {
+                    balazsRouteLine = L.polyline([from, to], {
+                        color: '#007aff', weight: 4, opacity: 0.6, className: 'route-path'
+                    }).addTo(map);
+                }
+            } else if (person === 'lena') {
+                if (lenaRouteLine) map.removeLayer(lenaRouteLine);
+                if (isActive) {
+                    lenaRouteLine = L.polyline([from, to], {
+                        color: '#ff2d55', weight: 4, opacity: 0.6, className: 'route-path'
+                    }).addTo(map);
+                }
+            }
+        }
+
+        function updateTracker(totalMinutes) {
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            const timeStr = (hours < 10 ? '0' : '') + hours + ':' + (minutes < 10 ? '0' : '') + minutes;
+            document.getElementById('timeDisplay').innerText = timeStr;
+
+            // --- BALÁZS LOGIKA ---
+            let bPos = coords.budaors;
+            let bStatus = "";
+            let bLocName = "Budaörs";
+            let bMoving = false;
+
+            if (totalMinutes >= toMins(0,10) && totalMinutes < toMins(6,0)) {
+                bPos = coords.budaors; bStatus = "Alszik";
+            } else if (totalMinutes >= toMins(6,0) && totalMinutes < toMins(7,30)) {
+                bPos = coords.budaors; bStatus = "A DÖk vezetőség csatornában írogat";
+            } else if (totalMinutes >= toMins(7,30) && totalMinutes < toMins(8,0)) {
+                let progress = (totalMinutes - toMins(7,30)) / 30;
+                bPos = interpolateCoords(coords.budaors, coords.creascola, progress);
+                bStatus = "Úton a Creascolába ➡️"; bLocName = "Budaörs ➔ Creascola";
+                bMoving = true;
+                updateRouteLine('balazs', coords.budaors, coords.creascola, true);
+            } else if (totalMinutes >= toMins(8,0) && totalMinutes < toMins(15,45)) {
+                bPos = coords.creascola; bStatus = "Iskolában (HS 2. emelet)"; bLocName = "Creascola (Liget u.)";
+            } else if (totalMinutes >= toMins(15,45) && totalMinutes < toMins(16,0)) {
+                let progress = (totalMinutes - toMins(15,45)) / 15;
+                bPos = interpolateCoords(coords.creascola, coords.budaors, progress);
+                bStatus = "Úton hazafelé ➡️"; bLocName = "Creascola ➔ Budaörs";
+                bMoving = true;
+                updateRouteLine('balazs', coords.creascola, coords.budaors, true);
+            } else if (totalMinutes >= toMins(16,0) && totalMinutes < toMins(17,0)) {
+                bPos = coords.budaors; bStatus = "Felkészülés a hosszú estére";
+            } else if (totalMinutes >= toMins(17,0) && totalMinutes < toMins(20,0)) {
+                bPos = coords.budaors; bStatus = "Közös program Lénával ❤️";
+            } else if (totalMinutes >= toMins(20,0) && totalMinutes <= toMins(23,59)) {
+                bPos = coords.budaors; bStatus = "Este Lénával...";
+            } else {
+                bPos = coords.budaors; bStatus = "Budaörs";
+            }
+            if (!bMoving) updateRouteLine('balazs', null, null, false);
+
+
+            // --- LÉNA LOGIKA ---
+            let lPos = coords.hegyalja;
+            let lStatus = "";
+            let lLocName = "Hegyalja (12. ker)";
+            let lMoving = false;
+
+            if (totalMinutes >= toMins(0,0) && totalMinutes < toMins(6,30)) {
+                lPos = coords.hegyalja; lStatus = "Alszik";
+            } else if (totalMinutes >= toMins(6,30) && totalMinutes < toMins(7,0)) {
+                lPos = coords.hegyalja; lStatus = "Készül Bazsinak 🥰";
+            } else if (totalMinutes >= toMins(7,0) && totalMinutes < toMins(8,0)) {
+                let progress = (totalMinutes - toMins(7,0)) / 60;
+                lPos = interpolateCoords(coords.hegyalja, coords.creascola, progress);
+                lStatus = "Úton az iskolába ➡️"; lLocName = "Hegyalja ➔ Creascola";
+                lMoving = true;
+                updateRouteLine('lena', coords.hegyalja, coords.creascola, true);
+            } else if (totalMinutes >= toMins(8,0) && totalMinutes < toMins(15,45)) {
+                lPos = coords.creascola; lStatus = "Iskolában"; lLocName = "Creascola (Liget u.)";
+            } else if (totalMinutes >= toMins(15,45) && totalMinutes < toMins(16,15)) {
+                let progress = (totalMinutes - toMins(15,45)) / 30;
+                lPos = interpolateCoords(coords.creascola, coords.hegyalja, progress);
+                lStatus = "Úton hazafelé ➡️"; lLocName = "Creascola ➔ Hegyalja";
+                lMoving = true;
+                updateRouteLine('lena', coords.creascola, coords.hegyalja, true);
+            } else if (totalMinutes >= toMins(16,15) && totalMinutes < toMins(16,30)) {
+                lPos = coords.hegyalja; lStatus = "Előkészülés a hosszú estére";
+            } else if (totalMinutes >= toMins(16,30) && totalMinutes < toMins(17,0)) {
+                let progress = (totalMinutes - toMins(16,30)) / 30;
+                lPos = interpolateCoords(coords.hegyalja, coords.budaors, progress);
+                lStatus = "Tart Budaörs felé Bazsihoz ➡️"; lLocName = "Hegyalja ➔ Budaörs";
+                lMoving = true;
+                updateRouteLine('lena', coords.hegyalja, coords.budaors, true);
+            } else if (totalMinutes >= toMins(17,0) && totalMinutes < toMins(20,0)) {
+                lPos = coords.budaors; lStatus = "Közös program Lénával ❤️"; lLocName = "Budaörs";
+            } else if (totalMinutes >= toMins(20,0) && totalMinutes < toMins(23,30)) {
+                lPos = coords.budaors; lStatus = "Este Bazsival..."; lLocName = "Budaörs";
+            } else if (totalMinutes >= toMins(23,30) && totalMinutes <= toMins(23,59)) {
+                let progress = (totalMinutes - toMins(23,30)) / 30;
+                lPos = interpolateCoords(coords.budaors, coords.hegyalja, progress);
+                lStatus = "Úton hazafelé Bazsitól ➡️"; lLocName = "Budaörs ➔ Hegyalja";
+                lMoving = true;
+                updateRouteLine('lena', coords.budaors, coords.hegyalja, true);
+            }
+            if (!lMoving) updateRouteLine('lena', null, null, false);
+
+            // Pozíciók és kártyák frissítése
+            balazsMarker.setLatLng(bPos);
+            lenaMarker.setLatLng(lPos);
+
+            document.getElementById('balazsLoc').innerText = bLocName;
+            document.getElementById('balazsBadge').innerText = bStatus;
+            document.getElementById('lenaLoc').innerText = lLocName;
+            document.getElementById('lenaBadge').innerText = lStatus;
+        }
+
+        const slider = document.getElementById('timeSlider');
+        slider.addEventListener('input', function() {
+            updateTracker(parseInt(this.value));
         });
-        L.marker(bariCoords, { icon: customIcon }).addTo(map);
+
+        updateTracker(parseInt(slider.value));
     </script>
 </body>
 </html>
